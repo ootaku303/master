@@ -221,8 +221,7 @@ class FemtoDreamContainer
                       T& femtoDKoutAxis, T& femtoDKsideAxis, T& femtoDKlongAxis, T& mTAxi4D, T& multPercentileAxis4D, T& qnAxis, T& pairPhiAxis, bool storeEProt)
   {
     if (storeEProt) {
-      // Same binning as the standard out/side/long histogram, but the three momentum axes hold the
-      // event-plane-rotated (magnetic-field frame) DK_x, DK_y, DK_z; DK_y is out-of-plane (||B) for every pair.
+      // DK_x, DK_y, DK_z are the EP-rotated (B-frame) axes; DK_y is out-of-plane (||B).
       mHistogramRegistry->add((folderName + "/relPair3dEProtRmTMultPercentileQnPairphi").c_str(), "; DK_{x} (GeV/#it{c}); DK_{y} (GeV/#it{c}); DK_{z} (GeV/#it{c}); #it{m}_{T} (GeV/#it{c}); Centrality; qn; #varphi_{pair} - #Psi_{EP}", o2::framework::HistType::kTHnSparseF, {femtoDKoutAxis, femtoDKsideAxis, femtoDKlongAxis, mTAxi4D, multPercentileAxis4D, qnAxis, pairPhiAxis});
     } else {
       mHistogramRegistry->add((folderName + "/relPair3dRmTMultPercentileQnPairphi").c_str(), ("; " + femtoDKout + femtoDKside + femtoDKlong + "; #it{m}_{T} (GeV/#it{c}); Centrality; qn; #varphi_{pair} - #Psi_{EP}").c_str(), o2::framework::HistType::kTHnSparseF, {femtoDKoutAxis, femtoDKsideAxis, femtoDKlongAxis, mTAxi4D, multPercentileAxis4D, qnAxis, pairPhiAxis});
@@ -264,8 +263,7 @@ class FemtoDreamContainer
     framework::AxisSpec qnAxis = {qnBins, "qn"};
     framework::AxisSpec pairPhiAxis = {pairPhiBins, "#varphi_{pair} - #Psi_{EP} (rad)"};
 
-    // When storing the EP-rotated (B-frame) components, relabel the three momentum axes as
-    // DK_x, DK_y, DK_z (same binning); ROOT takes the axis titles from the AxisSpec.
+    // EP-rotated (B-frame) axis labels, same binning as out/side/long.
     framework::AxisSpec DKxAxis = {DKoutBins, "DK_{x} (GeV/#it{c})"};
     framework::AxisSpec DKyAxis = {DKsideBins, "DK_{y} (GeV/#it{c})"};
     framework::AxisSpec DKzAxis = {DKlongBins, "DK_{z} (GeV/#it{c})"};
@@ -298,10 +296,7 @@ class FemtoDreamContainer
     mPDGTwo = pdg2;
   }
 
-  /// Store the event-plane-rotated (magnetic-field frame) DK_x, DK_y, DK_z instead of out, side, long
-  /// in the 3D qn histogram. DK_y is the out-of-plane (B) direction for every pair, so the cut
-  /// isolating a single component is applied offline on the output. Must be called before init_3Dqn().
-  /// \param doStore enable the EP-rotated histogram in place of the standard out/side/long one
+  /// Store EP-rotated (B-frame) DK_x,DK_y,DK_z instead of out,side,long. Call before init_3Dqn().
   void setStoreEProt(bool doStore) { mStoreEProt = doStore; }
 
   /// Pass a pair to the container and compute all the relevant observables
@@ -516,11 +511,7 @@ class FemtoDreamContainer
     }
   }
 
-  /// Signed φ_pair − Ψ_EP folded to (−π, π]. Identical definition to FemtoDreamMath::getPairPhiEP
-  /// but WITHOUT the final |·|, so it can serve as the (out, side) → (x, y) rotation angle for the
-  /// EP (B-frame) histogram. The folded |·| value (getPairPhiEP) is still used for the
-  /// φ_pair − Ψ_EP histogram axis; only the rotation needs the sign (cos is even, but sin is odd, so
-  /// feeding |Δφ| would rotate the wrong way for φ_pair < Ψ_EP and leak DK_out into DK_y).
+  /// Signed φ_pair − Ψ_EP (same as FemtoDreamMath::getPairPhiEP but without the final |·|); used as the B-frame rotation angle.
   template <typename T1, typename T2>
   static float getPairPhiEPSigned(const T1& part1, const float mass1, const T2& part2, const float mass2, const float Psi_ep)
   {
@@ -548,10 +539,7 @@ class FemtoDreamContainer
   void setPair_3Dqn_base(const float femtoDKout, const float femtoDKside, const float femtoDKlong, const float mT, const float multPercentile, const float myQnBin, const float pairPhiEP, bool storeEProt, const float pairPhiEPforRot)
   {
     if (storeEProt) {
-      // Rotate (out, side) into the event-plane (magnetic-field) frame so that DK_y is the out-of-plane
-      // (||B) component for every pair. Pure rotation in the same DK units as the standard histogram;
-      // DK_z is unchanged. The rotation uses the SIGNED φ_pair − Ψ_EP; the histogram axis keeps the
-      // folded |φ_pair − Ψ_EP|. The single-component cut is applied offline on the output.
+      // Rotate (out, side) by the signed φ_pair − Ψ_EP so DK_y is out-of-plane (||B); DK_z unchanged.
       const float DKx = femtoDKout * std::cos(pairPhiEPforRot) - femtoDKside * std::sin(pairPhiEPforRot);
       const float DKy = femtoDKout * std::sin(pairPhiEPforRot) + femtoDKside * std::cos(pairPhiEPforRot);
       const float DKz = femtoDKlong;
@@ -676,7 +664,7 @@ class FemtoDreamContainer
   int mPDGOne = 0;                                                                  ///< PDG code of particle 1
   int mPDGTwo = 0;                                                                  ///< PDG code of particle 2
   float mHighkstarCut = 6.;
-  bool mStoreEProt = false; ///< Store EP-rotated (B-frame) DK_x,DK_y,DK_z instead of out,side,long in the 3D qn histogram (set via setStoreEProt before init_3Dqn)
+  bool mStoreEProt = false; ///< Store EP-rotated (B-frame) DK_x,DK_y,DK_z instead of out,side,long
 };
 
 } // namespace o2::analysis::femtoDream
